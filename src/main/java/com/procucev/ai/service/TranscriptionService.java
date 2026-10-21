@@ -150,6 +150,13 @@ public class TranscriptionService {
         return toDelete.size();
     }
 
+    @Transactional
+    public long deleteAllTranscriptions() {
+        long count = repository.count();
+        repository.deleteAll();
+        return count;
+    }
+
     @Transactional(readOnly = true)
     public StatsResponse getDashboardStats() {
         long total = repository.count();

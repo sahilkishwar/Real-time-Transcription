@@ -15,7 +15,10 @@ class DashboardManager {
     this.filterFavorite = false;
     this.currentSort = 'createdAt-desc';
 
+    this.selectedIds = new Set();
+    this.pendingDeleteId = null;
     this.debounceTimer = null;
+
     this.initEventListeners();
   }
 
@@ -103,6 +106,33 @@ class DashboardManager {
     if (confirmEditBtn) {
       confirmEditBtn.addEventListener('click', () => this.handleSaveEdit());
     }
+
+    // Confirm Single Delete Modal Button
+    const confirmDeleteRecordBtn = document.getElementById('confirmDeleteRecordBtn');
+    if (confirmDeleteRecordBtn) {
+      confirmDeleteRecordBtn.addEventListener('click', () => this.executeDeleteRecord());
+    }
+
+    // Delete Selected (Batch) Button
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.addEventListener('click', () => this.executeBatchDelete());
+    }
+
+    // Clear All Button & Confirmation
+    const clearAllBtn = document.getElementById('clearAllHistoryBtn');
+    const clearAllModal = document.getElementById('clearAllModalOverlay');
+    const confirmClearAllBtn = document.getElementById('confirmClearAllBtn');
+
+    if (clearAllBtn && clearAllModal) {
+      clearAllBtn.addEventListener('click', () => {
+        clearAllModal.classList.add('active');
+      });
+    }
+
+    if (confirmClearAllBtn) {
+      confirmClearAllBtn.addEventListener('click', () => this.executeClearAll());
+    }
   }
 
   async loadStats() {
@@ -155,6 +185,8 @@ class DashboardManager {
 
   renderList(items) {
     this.container.innerHTML = '';
+    this.selectedIds.clear();
+    this.updateSelectedCounter();
 
     if (!items || items.length === 0) {
       if (this.emptyState) this.emptyState.style.display = 'block';
@@ -176,9 +208,9 @@ class DashboardManager {
 
     // Language badge class
     let badgeClass = 'badge-hinglish';
-    if (item.detectedLanguage.includes('Hindi') && !item.detectedLanguage.includes('English')) {
+    if (item.detectedLanguage && item.detectedLanguage.includes('Hindi') && !item.detectedLanguage.includes('English')) {
       badgeClass = 'badge-hindi';
-    } else if (item.detectedLanguage.includes('English') && !item.detectedLanguage.includes('Hindi')) {
+    } else if (item.detectedLanguage && item.detectedLanguage.includes('English') && !item.detectedLanguage.includes('Hindi')) {
       badgeClass = 'badge-english';
     }
 
@@ -197,12 +229,15 @@ class DashboardManager {
 
     card.innerHTML = `
       <div class="history-card-header">
-        <h4 class="history-card-title">${this.escapeHtml(item.title || 'Untitled Transcription')}</h4>
+        <div style="display: flex; align-items: flex-start; gap: 0.65rem; flex: 1;">
+          <input type="checkbox" class="record-select-checkbox" data-id="${item.id}" title="Select for batch delete" style="margin-top: 4px; cursor: pointer; transform: scale(1.15);">
+          <h4 class="history-card-title">${this.escapeHtml(item.title || 'Untitled Transcription')}</h4>
+        </div>
         <button class="star-btn ${isStarred}" data-id="${item.id}" title="Toggle Star/Favorite">${starIcon}</button>
       </div>
 
       <div class="history-card-meta">
-        <span class="badge ${badgeClass}">${this.escapeHtml(item.detectedLanguage)}</span>
+        <span class="badge ${badgeClass}">${this.escapeHtml(item.detectedLanguage || 'Hinglish')}</span>
         <span>⏱️ ${item.formattedCreatedAt || 'Recent'}</span>
         <span>📝 ${item.wordCount || 0} words</span>
       </div>
@@ -241,34 +276,180 @@ class DashboardManager {
       </div>
     `;
 
-    // Attach card action listeners
+    // Checkbox selection listener
+    const checkbox = card.querySelector('.record-select-checkbox');
+    checkbox.addEventListener('change', (e) => {
+      const id = Number(e.target.getAttribute('data-id'));
+      if (e.target.checked) {
+        this.selectedIds.add(id);
+        card.style.boxShadow = '0 0 0 2px var(--primary)';
+      } else {
+        this.selectedIds.delete(id);
+        card.style.boxShadow = '';
+      }
+      this.updateSelectedCounter();
+    });
+
+    // Star favorite listener
     const starBtn = card.querySelector('.star-btn');
     starBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.toggleFavorite(item.id, starBtn);
     });
 
+    // TTS playback
     card.querySelector('[data-action="tts"]').addEventListener('click', () => {
       if (window.speechService) {
         window.speechService.speakText(item.content);
-        this.showToast('Speaking transcription...', 'info');
+        this.showToast('Speaking transcription aloud...', 'info');
       }
     });
 
+    // Copy to clipboard
     card.querySelector('[data-action="copy"]').addEventListener('click', () => {
       navigator.clipboard.writeText(item.content);
       this.showToast('Transcript copied to clipboard!', 'success');
     });
 
+    // Edit modal
     card.querySelector('[data-action="edit"]').addEventListener('click', () => {
       this.openEditModal(item);
     });
 
-    card.querySelector('[data-action="delete"]').addEventListener('click', () => {
-      this.deleteRecord(item.id);
+    // Delete trigger - opens dedicated in-page delete modal!
+    card.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openDeleteModal(item);
     });
 
     return card;
+  }
+
+  updateSelectedCounter() {
+    const btn = document.getElementById('deleteSelectedBtn');
+    const span = document.getElementById('selectedCountSpan');
+    if (!btn || !span) return;
+
+    const count = this.selectedIds.size;
+    span.textContent = count;
+    btn.style.display = count > 0 ? 'inline-flex' : 'none';
+  }
+
+  openDeleteModal(item) {
+    this.pendingDeleteId = item.id;
+    const titleEl = document.getElementById('deleteTargetRecordTitle');
+    const hiddenId = document.getElementById('pendingDeleteRecordId');
+    const modal = document.getElementById('deleteConfirmModalOverlay');
+
+    if (titleEl) titleEl.textContent = item.title || 'Untitled Transcription';
+    if (hiddenId) hiddenId.value = item.id;
+    if (modal) modal.classList.add('active');
+  }
+
+  async executeDeleteRecord() {
+    const id = this.pendingDeleteId;
+    if (!id) return;
+
+    const modal = document.getElementById('deleteConfirmModalOverlay');
+    const confirmBtn = document.getElementById('confirmDeleteRecordBtn');
+    if (confirmBtn) {
+      confirmBtn.textContent = 'Deleting...';
+      confirmBtn.disabled = true;
+    }
+
+    try {
+      const res = await fetch(`/api/transcriptions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete request failed: HTTP ' + res.status);
+
+      // Animate card removal immediately from DOM
+      const card = document.getElementById(`historyCard-${id}`);
+      if (card) {
+        card.style.transition = 'all 0.3s ease';
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.85)';
+        setTimeout(() => card.remove(), 300);
+      }
+
+      this.selectedIds.delete(Number(id));
+      this.updateSelectedCounter();
+      if (modal) modal.classList.remove('active');
+
+      this.showToast('Transcription deleted successfully! 🗑️', 'success');
+      setTimeout(() => {
+        this.loadTranscriptions();
+        this.loadStats();
+      }, 350);
+
+    } catch (err) {
+      console.error('Failed to delete:', err);
+      this.showToast('Failed to delete: ' + err.message, 'error');
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.textContent = 'Yes, Delete Record';
+        confirmBtn.disabled = false;
+      }
+      this.pendingDeleteId = null;
+    }
+  }
+
+  async executeBatchDelete() {
+    if (this.selectedIds.size === 0) return;
+
+    const ids = Array.from(this.selectedIds);
+    if (!confirm(`Are you sure you want to delete the ${ids.length} selected transcriptions?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/transcriptions/batch-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids })
+      });
+
+      if (!res.ok) throw new Error('Batch delete failed');
+      const data = await res.json();
+
+      this.showToast(`Deleted ${data.deletedCount || ids.length} transcriptions! 🗑️`, 'success');
+      this.selectedIds.clear();
+      this.updateSelectedCounter();
+      this.loadTranscriptions();
+      this.loadStats();
+
+    } catch (err) {
+      console.error('Batch delete error:', err);
+      this.showToast('Failed to delete selected items: ' + err.message, 'error');
+    }
+  }
+
+  async executeClearAll() {
+    const modal = document.getElementById('clearAllModalOverlay');
+    const confirmBtn = document.getElementById('confirmClearAllBtn');
+    if (confirmBtn) {
+      confirmBtn.textContent = 'Deleting all...';
+      confirmBtn.disabled = true;
+    }
+
+    try {
+      const res = await fetch('/api/transcriptions/all', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Clear all failed');
+
+      if (modal) modal.classList.remove('active');
+      this.showToast('All transcriptions cleared from database! ⚠️', 'info');
+      this.selectedIds.clear();
+      this.updateSelectedCounter();
+      this.loadTranscriptions();
+      this.loadStats();
+
+    } catch (err) {
+      console.error('Clear all error:', err);
+      this.showToast('Failed to clear database: ' + err.message, 'error');
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.textContent = 'Yes, Delete Everything';
+        confirmBtn.disabled = false;
+      }
+    }
   }
 
   async toggleFavorite(id, buttonEl) {
@@ -280,7 +461,7 @@ class DashboardManager {
       buttonEl.classList.toggle('starred', updated.isFavorite);
       buttonEl.textContent = updated.isFavorite ? '★' : '☆';
       this.loadStats();
-      this.showToast(updated.isFavorite ? 'Marked as favorite' : 'Removed from favorites', 'info');
+      this.showToast(updated.isFavorite ? 'Marked as favorite ⭐' : 'Removed from favorites', 'info');
     } catch (err) {
       this.showToast('Failed to update favorite', 'error');
     }
@@ -321,28 +502,11 @@ class DashboardManager {
       const modal = document.getElementById('editModalOverlay');
       if (modal) modal.classList.remove('active');
 
-      this.showToast('Transcription updated successfully!', 'success');
+      this.showToast('Transcription updated successfully! ✏️', 'success');
       this.loadTranscriptions();
 
     } catch (err) {
       this.showToast('Failed to update transcription', 'error');
-    }
-  }
-
-  async deleteRecord(id) {
-    if (!confirm('Are you sure you want to delete this transcription? This cannot be undone.')) {
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/transcriptions/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Delete failed');
-
-      this.showToast('Transcription deleted', 'success');
-      this.loadTranscriptions();
-      this.loadStats();
-    } catch (err) {
-      this.showToast('Failed to delete transcription', 'error');
     }
   }
 

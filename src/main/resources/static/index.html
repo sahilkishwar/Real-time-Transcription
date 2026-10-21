@@ -278,6 +278,14 @@
           <button class="btn btn-primary" id="refreshHistoryBtn" title="Refresh records">
             🔄 Refresh
           </button>
+
+          <button class="btn btn-danger" id="deleteSelectedBtn" style="display: none;" title="Delete selected transcriptions">
+            🗑️ Delete Selected (<span id="selectedCountSpan">0</span>)
+          </button>
+
+          <button class="btn btn-outline btn-danger" id="clearAllHistoryBtn" title="Delete all transcriptions from database">
+            ⚠️ Clear All
+          </button>
         </div>
       </div>
 
@@ -509,6 +517,58 @@
         <button class="btn btn-outline" data-close="polishModalOverlay">Cancel</button>
         <button class="btn" id="runPolishBtn">⚡ Process with AI</button>
         <button class="btn btn-success" id="applyPolishBtn">Apply to Live Transcript</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Single Record Confirmation Modal -->
+  <div class="modal-overlay" id="deleteConfirmModalOverlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
+          <span>🗑️</span> Delete Transcription
+        </h3>
+        <button class="modal-close-btn" data-close="deleteConfirmModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="pendingDeleteRecordId">
+        <p style="color: var(--text-secondary); margin-bottom: 0.85rem; font-size: 0.92rem;">
+          Are you sure you want to delete this transcription record?
+        </p>
+        <div id="deleteTargetRecordTitle" style="font-weight: 600; padding: 0.75rem 1rem; background: rgba(239, 68, 68, 0.08); border-left: 3px solid var(--danger); border-radius: var(--radius-sm); margin-bottom: 0.75rem; color: var(--text-primary); word-break: break-word;">
+          Untitled
+        </div>
+        <p style="font-size: 0.78rem; color: var(--text-muted);">
+          This will permanently remove the record from your relational database.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="deleteConfirmModalOverlay">Cancel</button>
+        <button class="btn btn-danger" id="confirmDeleteRecordBtn">Yes, Delete Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear All Records Confirmation Modal -->
+  <div class="modal-overlay" id="clearAllModalOverlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="color: var(--danger); display: flex; align-items: center; gap: 0.5rem;">
+          <span>⚠️</span> Clear All Transcriptions
+        </h3>
+        <button class="modal-close-btn" data-close="clearAllModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 0.85rem; font-size: 0.92rem;">
+          Are you sure you want to delete <strong>ALL</strong> transcriptions stored in the database?
+        </p>
+        <p style="font-size: 0.78rem; color: var(--text-muted); background: rgba(239, 68, 68, 0.08); padding: 0.6rem; border-radius: var(--radius-sm);">
+          This cannot be undone. All audio notes, transcripts, and metrics will be deleted.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="clearAllModalOverlay">Cancel</button>
+        <button class="btn btn-danger" id="confirmClearAllBtn">Yes, Delete Everything</button>
       </div>
     </div>
   </div>

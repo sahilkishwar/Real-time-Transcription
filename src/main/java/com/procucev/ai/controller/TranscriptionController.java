@@ -75,6 +75,16 @@ public class TranscriptionController {
         ));
     }
 
+    @DeleteMapping("/all")
+    public ResponseEntity<Map<String, Object>> deleteAllTranscriptions() {
+        long deletedCount = transcriptionService.deleteAllTranscriptions();
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "deletedCount", deletedCount,
+                "message", "All transcriptions deleted successfully"
+        ));
+    }
+
     @PostMapping("/batch-delete")
     public ResponseEntity<Map<String, Object>> batchDelete(@RequestBody Map<String, List<Long>> payload) {
         List<Long> ids = payload.get("ids");
@@ -83,6 +93,14 @@ public class TranscriptionController {
                 "success", true,
                 "deletedCount", deletedCount,
                 "message", deletedCount + " transcriptions deleted successfully"
+        ));
+    }
+
+    @ExceptionHandler(java.util.NoSuchElementException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(java.util.NoSuchElementException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "success", false,
+                "message", ex.getMessage()
         ));
     }
 

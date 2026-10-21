@@ -47,6 +47,7 @@ class SpeechService {
     this.recognition.onresult = (event) => {
       this.networkErrorCount = 0;
       this.cloudSpeechFailed = false;
+      this.lastError = null;
       let interim = '';
       let final = '';
 

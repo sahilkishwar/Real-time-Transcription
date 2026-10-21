@@ -55,8 +55,7 @@ public class GeminiSpeechService implements SpeechToTextService {
         String activeKey = (apiKeyOverride != null && !apiKeyOverride.trim().isEmpty()) ? apiKeyOverride.trim() : this.apiKey;
 
         if (activeKey == null || activeKey.trim().isEmpty() || activeKey.equals("YOUR_GEMINI_API_KEY")) {
-            log.warn("Gemini API key is not configured. Falling back to local/client processing.");
-            return simulateTranscription(languageHint);
+            throw new IllegalStateException("Google Gemini API key is not configured on the server. Please click the 🔑 key icon in the navbar to enter your Gemini API key for backend audio transcription.");
         }
 
         if (audioData == null || audioData.length == 0) {

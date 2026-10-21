@@ -202,8 +202,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function toggleRecording() {
     if (speechService.isListening) {
-      // Stop recording
-      const hadNetworkIssue = speechService.cloudSpeechFailed || speechService.lastError === 'network';
       speechService.stopListening();
       visualizer.disconnect();
       stopTimer();
@@ -212,14 +210,22 @@ document.addEventListener('DOMContentLoaded', () => {
       micIcon.textContent = '🎙️';
       micStatusLabel.textContent = 'Microphone Paused';
 
-      // Check if browser recognized any words
+      // CRITICAL: Check if speech was captured by the browser
       const currentText = (fullFinalTranscript + ' ' + liveInterimTranscript).trim();
-      const recordedBlob = speechService.getRecordedAudioBlob();
 
-      // If browser speech was empty or had network issues, auto-transcribe the recorded audio!
-      if ((!currentText || hadNetworkIssue) && recordedBlob && recordedBlob.size > 1500) {
-        micStatusLabel.textContent = 'Transcribing recorded audio...';
-        showToast('Processing recorded audio with AI speech service...', 'info');
+      // If user spoke and speech was transcribed, NEVER overwrite it!
+      if (currentText && currentText.length > 0) {
+        micStatusLabel.textContent = 'Transcription ready';
+        return;
+      }
+
+      // ONLY if NO words were recognized by the browser, check if Gemini audio transcription is available
+      const recordedBlob = speechService.getRecordedAudioBlob();
+      const storedApiKey = localStorage.getItem('procucev_gemini_api_key');
+
+      if (recordedBlob && recordedBlob.size > 2000 && storedApiKey && storedApiKey.trim()) {
+        micStatusLabel.textContent = 'Transcribing recorded audio with Gemini...';
+        showToast('Transcribing audio via Gemini AI engine...', 'info');
         await transcribeRecordedBlob(recordedBlob);
       }
     } else {

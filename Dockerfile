@@ -15,15 +15,19 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Security: Run as non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+# Security: Run as non-root user with full ownership of /app and persistent data directory
+RUN addgroup -S appgroup && \
+    adduser -S appuser -G appgroup && \
+    mkdir -p /app/data && \
+    chown -R appuser:appgroup /app
 
-# Copy jar from build stage
-COPY --from=build /app/target/realtime-transcription-service-*.jar app.jar
+# Copy jar from build stage with appuser ownership
+COPY --from=build --chown=appuser:appgroup /app/target/realtime-transcription-service-*.jar /app/app.jar
+
+USER appuser
 
 # Cloud platforms pass PORT dynamic variable
 ENV PORT=8080
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "/app/app.jar"]

@@ -13,6 +13,13 @@ import java.time.LocalDateTime;
 public class RealtimeTranscriptionApplication {
 
     public static void main(String[] args) {
+        try {
+            java.io.File dataDir = new java.io.File("./data");
+            if (!dataDir.exists()) {
+                dataDir.mkdirs();
+            }
+        } catch (Exception ignored) {
+        }
         SpringApplication.run(RealtimeTranscriptionApplication.class, args);
     }
 

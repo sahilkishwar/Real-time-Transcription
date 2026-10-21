@@ -23,13 +23,16 @@ public class TranscriptionService {
     private final TranscriptionRepository repository;
     private final LanguageDetectionService languageDetectionService;
     private final ObjectMapper objectMapper;
+    private final ExportService exportService;
 
     public TranscriptionService(TranscriptionRepository repository,
                                 LanguageDetectionService languageDetectionService,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                ExportService exportService) {
         this.repository = repository;
         this.languageDetectionService = languageDetectionService;
         this.objectMapper = objectMapper;
+        this.exportService = exportService;
     }
 
     @Transactional
@@ -219,14 +222,14 @@ public class TranscriptionService {
                 return txt.toString();
 
             case "srt":
-                StringBuilder srt = new StringBuilder();
-                int index = 1;
-                for (Transcription t : all) {
-                    srt.append(index++).append("\n");
-                    srt.append("00:00:00,000 --> 00:00:05,000\n");
-                    srt.append(t.getContent()).append("\n\n");
-                }
-                return srt.toString();
+                return exportService.exportToSrt(all);
+
+            case "vtt":
+                return exportService.exportToWebVtt(all);
+
+            case "md":
+            case "markdown":
+                return exportService.exportToMarkdown(all);
 
             case "json":
             default:

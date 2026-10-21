@@ -29,7 +29,8 @@ public class SpeechController {
     @PostMapping("/transcribe-audio")
     public ResponseEntity<Map<String, Object>> transcribeAudio(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "language", required = false) String language) {
+            @RequestParam(value = "language", required = false) String language,
+            @RequestHeader(value = "X-Gemini-API-Key", required = false) String apiKeyHeader) {
         try {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Uploaded audio file is empty"));
@@ -37,7 +38,7 @@ public class SpeechController {
 
             byte[] bytes = file.getBytes();
             String mimeType = file.getContentType();
-            String transcript = speechToTextService.transcribeAudio(bytes, mimeType, language);
+            String transcript = speechToTextService.transcribeAudio(bytes, mimeType, language, apiKeyHeader);
 
             LanguageDetectionService.DetectionResult detection = languageDetectionService.analyze(transcript);
 
@@ -58,9 +59,11 @@ public class SpeechController {
     }
 
     @PostMapping("/polish")
-    public ResponseEntity<PolishResponse> polishHinglish(@RequestBody PolishRequest request) {
+    public ResponseEntity<PolishResponse> polishHinglish(
+            @RequestBody PolishRequest request,
+            @RequestHeader(value = "X-Gemini-API-Key", required = false) String apiKeyHeader) {
         try {
-            String polished = speechToTextService.polishHinglishText(request.getText(), request.getMode());
+            String polished = speechToTextService.polishHinglishText(request.getText(), request.getMode(), apiKeyHeader);
             LanguageDetectionService.DetectionResult detection = languageDetectionService.analyze(polished);
 
             PolishResponse response = new PolishResponse(

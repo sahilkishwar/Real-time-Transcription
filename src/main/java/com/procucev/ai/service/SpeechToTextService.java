@@ -12,14 +12,15 @@ public interface SpeechToTextService {
      */
     String transcribeAudio(byte[] audioData, String mimeType, String languageHint) throws Exception;
 
-    /**
-     * Polish and enhance Hinglish / multilingual text.
-     *
-     * @param text raw transcribed text
-     * @param mode formatting mode: "clean", "devanagari", "romanized", "english_translation", "punctuate"
-     * @return polished text
-     */
+    default String transcribeAudio(byte[] audioData, String mimeType, String languageHint, String apiKeyOverride) throws Exception {
+        return transcribeAudio(audioData, mimeType, languageHint);
+    }
+
     String polishHinglishText(String text, String mode) throws Exception;
+
+    default String polishHinglishText(String text, String mode, String apiKeyOverride) throws Exception {
+        return polishHinglishText(text, mode);
+    }
 
     /**
      * Whether the backend AI engine is configured with a valid API key.

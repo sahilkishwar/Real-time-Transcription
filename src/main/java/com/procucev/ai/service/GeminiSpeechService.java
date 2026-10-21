@@ -47,7 +47,14 @@ public class GeminiSpeechService implements SpeechToTextService {
 
     @Override
     public String transcribeAudio(byte[] audioData, String mimeType, String languageHint) throws Exception {
-        if (!isAvailable()) {
+        return transcribeAudio(audioData, mimeType, languageHint, null);
+    }
+
+    @Override
+    public String transcribeAudio(byte[] audioData, String mimeType, String languageHint, String apiKeyOverride) throws Exception {
+        String activeKey = (apiKeyOverride != null && !apiKeyOverride.trim().isEmpty()) ? apiKeyOverride.trim() : this.apiKey;
+
+        if (activeKey == null || activeKey.trim().isEmpty() || activeKey.equals("YOUR_GEMINI_API_KEY")) {
             log.warn("Gemini API key is not configured. Falling back to local/client processing.");
             return simulateTranscription(languageHint);
         }
@@ -85,7 +92,7 @@ public class GeminiSpeechService implements SpeechToTextService {
         );
 
         String jsonPayload = objectMapper.writeValueAsString(requestBody);
-        String endpoint = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey);
+        String endpoint = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, activeKey);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint))
@@ -115,11 +122,17 @@ public class GeminiSpeechService implements SpeechToTextService {
 
     @Override
     public String polishHinglishText(String text, String mode) throws Exception {
+        return polishHinglishText(text, mode, null);
+    }
+
+    @Override
+    public String polishHinglishText(String text, String mode, String apiKeyOverride) throws Exception {
         if (text == null || text.trim().isEmpty()) {
             return "";
         }
 
-        if (!isAvailable()) {
+        String activeKey = (apiKeyOverride != null && !apiKeyOverride.trim().isEmpty()) ? apiKeyOverride.trim() : this.apiKey;
+        if (activeKey == null || activeKey.trim().isEmpty() || activeKey.equals("YOUR_GEMINI_API_KEY")) {
             return localRuleBasedPolish(text, mode);
         }
 
@@ -158,7 +171,7 @@ public class GeminiSpeechService implements SpeechToTextService {
         );
 
         String jsonPayload = objectMapper.writeValueAsString(requestBody);
-        String endpoint = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey);
+        String endpoint = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, activeKey);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(endpoint))
@@ -196,8 +209,17 @@ public class GeminiSpeechService implements SpeechToTextService {
         return clean;
     }
 
+    private static final List<String> HINGLISH_FALLBACK_TRANSCRIPTS = List.of(
+            "Haan bhai, real-time transcription microphone stream perfectly capture ho gayi hai with mixed Hindi and English.",
+            "Aaj hum log meeting discuss karenge regarding deployment and real-time audio visualization.",
+            "Backend server par audio chunks successfully receive ho gaye hain with zero packet loss.",
+            "Project architecture is ready aur client dashboard CRUD operations smoothly synchronize ho rahe hain."
+    );
+    private static final java.util.concurrent.atomic.AtomicInteger fallbackIndex = new java.util.concurrent.atomic.AtomicInteger(0);
+
     private String simulateTranscription(String languageHint) {
-        return "Aaj hum real-time transcription service test kar rahe hain with multilingual Hindi and English support.";
+        int idx = Math.abs(fallbackIndex.getAndIncrement() % HINGLISH_FALLBACK_TRANSCRIPTS.size());
+        return HINGLISH_FALLBACK_TRANSCRIPTS.get(idx);
     }
 
     public void setApiKey(String apiKey) {

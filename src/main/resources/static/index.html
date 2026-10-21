@@ -44,6 +44,7 @@
         <span class="status-dot" id="wsStatusDot"></span>
         <span id="wsStatusText">WebSocket Live</span>
       </div>
+      <button class="icon-btn" id="apiKeyModalBtn" title="Gemini API Key Settings (Optional)">🔑</button>
       <button class="icon-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">🌓</button>
       <a href="/h2-console" target="_blank" class="icon-btn" title="Open H2 Database Console">🗄️</a>
     </div>
@@ -159,11 +160,11 @@
             </div>
 
             <!-- Transcript Area -->
-            <div class="transcript-area" id="liveTranscriptArea">
+            <div class="transcript-area" id="liveTranscriptArea" contenteditable="true" spellcheck="false" title="Live transcript updates here. You can also click to edit directly.">
               <div class="transcript-placeholder" id="transcriptPlaceholder">
                 <div style="font-size: 2.2rem; opacity: 0.6;">🎙️</div>
                 <div style="font-weight: 500;">Speak naturally in Hindi, English, or mixed Hinglish.</div>
-                <div style="font-size: 0.85rem;">Words will be transcribed and detected in real-time as you speak.</div>
+                <div style="font-size: 0.85rem;">Words will be transcribed and detected in real-time as you speak. You can also click to edit.</div>
               </div>
               <span class="finalized-text" id="finalizedTextSpan"></span>
               <span class="interim-text" id="interimTextSpan"></span>
@@ -569,6 +570,34 @@
       <div class="modal-footer">
         <button class="btn btn-outline" data-close="clearAllModalOverlay">Cancel</button>
         <button class="btn btn-danger" id="confirmClearAllBtn">Yes, Delete Everything</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gemini API Key Modal -->
+  <div class="modal-overlay" id="apiKeyModalOverlay">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 class="modal-title" style="display: flex; align-items: center; gap: 0.5rem;">
+          <span>🔑</span> Google Gemini API Key
+        </h3>
+        <button class="modal-close-btn" data-close="apiKeyModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 0.85rem; font-size: 0.88rem; line-height: 1.5;">
+          Provide your Gemini API key to enable high-accuracy audio multimodal transcription and AI Hinglish refinement directly in your browser session.
+        </p>
+        <div class="control-group">
+          <label class="control-label" for="geminiApiKeyInput">API Key</label>
+          <input type="password" class="form-input" id="geminiApiKeyInput" placeholder="AIzaSy...">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+            Key is stored locally in your browser's localStorage and sent securely to backend endpoints.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="apiKeyModalOverlay">Cancel</button>
+        <button class="btn btn-primary" id="saveApiKeyBtn">Save API Key</button>
       </div>
     </div>
   </div>

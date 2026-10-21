@@ -203,6 +203,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function toggleRecording() {
     if (speechService.isListening) {
       // Stop recording
+      const hadNetworkIssue = speechService.cloudSpeechFailed || speechService.lastError === 'network';
       speechService.stopListening();
       visualizer.disconnect();
       stopTimer();
@@ -210,6 +211,17 @@ document.addEventListener('DOMContentLoaded', () => {
       micGlowRing.style.opacity = '0';
       micIcon.textContent = '🎙️';
       micStatusLabel.textContent = 'Microphone Paused';
+
+      // Check if browser recognized any words
+      const currentText = (fullFinalTranscript + ' ' + liveInterimTranscript).trim();
+      const recordedBlob = speechService.getRecordedAudioBlob();
+
+      // If browser speech was empty or had network issues, auto-transcribe the recorded audio!
+      if ((!currentText || hadNetworkIssue) && recordedBlob && recordedBlob.size > 1500) {
+        micStatusLabel.textContent = 'Transcribing recorded audio...';
+        showToast('Processing recorded audio with AI speech service...', 'info');
+        await transcribeRecordedBlob(recordedBlob);
+      }
     } else {
       // Start recording
       try {
@@ -226,6 +238,47 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch (err) {
         showToast('Microphone access failed. Please allow mic permissions.', 'error');
       }
+    }
+  }
+
+  async function transcribeRecordedBlob(blob) {
+    if (!blob || blob.size < 1000) return;
+
+    const formData = new FormData();
+    formData.append('file', blob, 'microphone-recording.webm');
+    formData.append('language', languageSelect ? languageSelect.value : 'hinglish');
+
+    const headers = {};
+    const storedApiKey = localStorage.getItem('procucev_gemini_api_key');
+    if (storedApiKey && storedApiKey.trim()) {
+      headers['X-Gemini-API-Key'] = storedApiKey.trim();
+    }
+
+    try {
+      const res = await fetch('/api/speech/transcribe-audio', {
+        method: 'POST',
+        headers: headers,
+        body: formData
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      if (data.success && data.transcript) {
+        fullFinalTranscript = data.transcript;
+        liveInterimTranscript = '';
+        if (finalizedSpan) finalizedSpan.textContent = data.transcript;
+        if (interimSpan) interimSpan.textContent = '';
+        if (placeholder) placeholder.style.display = 'none';
+
+        updateLiveMetrics();
+        showToast('Audio transcribed successfully! 🎙️', 'success');
+        micStatusLabel.textContent = 'Transcription ready';
+      }
+    } catch (err) {
+      console.warn('Audio transcription error:', err);
+      showToast('Could not transcribe audio: ' + err.message, 'error');
+      micStatusLabel.textContent = 'Ready to listen';
     }
   }
 
@@ -252,9 +305,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleSpeechError(error) {
-    if (error !== 'no-speech') {
-      showToast(`Speech error: ${error}`, 'error');
+    if (error === 'no-speech') return;
+    if (error === 'network') {
+      showToast('Browser speech cloud has a network restriction. Audio is being recorded for auto-transcription on stop.', 'info');
+      return;
     }
+    showToast(`Speech error: ${error}`, 'error');
   }
 
   function handleSpeechStatusChange(status) {
@@ -444,10 +500,16 @@ document.addEventListener('DOMContentLoaded', () => {
         runPolishBtn.textContent = '⏳ Processing...';
         runPolishBtn.disabled = true;
 
+        const polishHeaders = { 'Content-Type': 'application/json' };
+        const storedApiKey = localStorage.getItem('procucev_gemini_api_key');
+        if (storedApiKey && storedApiKey.trim()) {
+          polishHeaders['X-Gemini-API-Key'] = storedApiKey.trim();
+        }
+
         try {
           const res = await fetch('/api/speech/polish', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: polishHeaders,
             body: JSON.stringify({ text, mode })
           });
 
@@ -478,6 +540,48 @@ document.addEventListener('DOMContentLoaded', () => {
         polishModal.classList.remove('active');
         showToast('Applied refined Hinglish text!', 'success');
         updateLiveMetrics();
+      });
+    }
+
+    // Direct Edit Sync for Live Transcript Area
+    const liveArea = document.getElementById('liveTranscriptArea');
+    if (liveArea) {
+      liveArea.addEventListener('input', () => {
+        fullFinalTranscript = liveArea.innerText.trim();
+        liveInterimTranscript = '';
+        if (placeholder) {
+          placeholder.style.display = fullFinalTranscript ? 'none' : 'flex';
+        }
+        updateLiveMetrics();
+      });
+    }
+
+    // Gemini API Key Modal
+    const apiKeyBtn = document.getElementById('apiKeyModalBtn');
+    const apiKeyModal = document.getElementById('apiKeyModalOverlay');
+    const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+    const apiKeyInput = document.getElementById('geminiApiKeyInput');
+
+    if (apiKeyBtn && apiKeyModal) {
+      apiKeyBtn.addEventListener('click', () => {
+        if (apiKeyInput) {
+          apiKeyInput.value = localStorage.getItem('procucev_gemini_api_key') || '';
+        }
+        apiKeyModal.classList.add('active');
+      });
+    }
+
+    if (saveApiKeyBtn && apiKeyInput) {
+      saveApiKeyBtn.addEventListener('click', () => {
+        const val = apiKeyInput.value.trim();
+        if (val) {
+          localStorage.setItem('procucev_gemini_api_key', val);
+          showToast('Gemini API key saved! Multimodal audio AI active 🔑', 'success');
+        } else {
+          localStorage.removeItem('procucev_gemini_api_key');
+          showToast('Gemini API key removed. Using default mode.', 'info');
+        }
+        if (apiKeyModal) apiKeyModal.classList.remove('active');
       });
     }
 
@@ -557,9 +661,16 @@ document.addEventListener('DOMContentLoaded', () => {
       formData.append('file', file);
       formData.append('language', languageSelect ? languageSelect.value : 'hinglish');
 
+      const headers = {};
+      const storedApiKey = localStorage.getItem('procucev_gemini_api_key');
+      if (storedApiKey && storedApiKey.trim()) {
+        headers['X-Gemini-API-Key'] = storedApiKey.trim();
+      }
+
       try {
         const res = await fetch('/api/speech/transcribe-audio', {
           method: 'POST',
+          headers: headers,
           body: formData
         });
 
@@ -586,9 +697,19 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /**
-   * Floating Toast Notifications
+   * Floating Toast Notifications with deduplication
    */
+  let lastToastText = '';
+  let lastToastTimestamp = 0;
+
   function showToast(message, type = 'info') {
+    const now = Date.now();
+    if (message === lastToastText && (now - lastToastTimestamp) < 3000) {
+      return; // Deduplicate repeated toasts
+    }
+    lastToastText = message;
+    lastToastTimestamp = now;
+
     const container = document.getElementById('toastContainer');
     if (!container) return;
 

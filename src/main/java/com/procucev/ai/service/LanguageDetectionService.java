@@ -97,7 +97,10 @@ public class LanguageDetectionService {
         int finalHindi = devanagariCount + unambiguousHindiCount;
         int finalEnglish = unambiguousEnglishCount;
 
-        if (finalHindi > finalEnglish) {
+        if (devanagariCount == 0 && unambiguousHindiCount == 0) {
+            finalHindi = 0;
+            finalEnglish = Math.max(1, unambiguousEnglishCount + ambiguousCount);
+        } else if (finalHindi > finalEnglish) {
             finalHindi += ambiguousCount;
         } else {
             finalEnglish += ambiguousCount;

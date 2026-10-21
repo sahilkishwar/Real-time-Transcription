@@ -219,14 +219,37 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      // ONLY if NO words were recognized by the browser, check if Gemini audio transcription is available
+      // ONLY if NO words were recognized by the browser, transcribe the captured audio!
       const recordedBlob = speechService.getRecordedAudioBlob();
       const storedApiKey = localStorage.getItem('procucev_gemini_api_key');
 
-      if (recordedBlob && recordedBlob.size > 2000 && storedApiKey && storedApiKey.trim()) {
-        micStatusLabel.textContent = 'Transcribing recorded audio with Gemini...';
-        showToast('Transcribing audio via Gemini AI engine...', 'info');
-        await transcribeRecordedBlob(recordedBlob);
+      if (recordedBlob && recordedBlob.size > 1500) {
+        if (storedApiKey && storedApiKey.trim()) {
+          micStatusLabel.textContent = 'Transcribing recorded audio with Gemini...';
+          showToast('Transcribing audio via Gemini AI engine...', 'info');
+          await transcribeRecordedBlob(recordedBlob);
+        } else if (window.puter && window.puter.ai && window.puter.ai.speech2txt) {
+          micStatusLabel.textContent = 'Transcribing recorded audio with AI...';
+          showToast('Transcribing audio with multilingual AI...', 'info');
+          try {
+            const result = await puter.ai.speech2txt(recordedBlob);
+            const text = (typeof result === 'string') ? result : (result && result.text ? result.text : '');
+            if (text && text.trim()) {
+              fullFinalTranscript = text.trim();
+              liveInterimTranscript = '';
+              if (finalizedSpan) finalizedSpan.textContent = text.trim();
+              if (placeholder) placeholder.style.display = 'none';
+              updateLiveMetrics();
+              showToast('Audio transcribed successfully! 🎙️', 'success');
+              micStatusLabel.textContent = 'Transcription ready';
+            } else {
+              micStatusLabel.textContent = 'Ready to listen';
+            }
+          } catch (puterErr) {
+            console.warn('Puter transcription error:', puterErr);
+            micStatusLabel.textContent = 'Microphone Paused';
+          }
+        }
       }
     } else {
       // Start recording
@@ -696,6 +719,25 @@ document.addEventListener('DOMContentLoaded', () => {
           throw new Error(data.error || 'Transcription failed');
         }
       } catch (err) {
+        if (window.puter && window.puter.ai && window.puter.ai.speech2txt) {
+          try {
+            uploadStatus.textContent = `⏳ Transcribing "${file.name}" with multilingual AI...`;
+            const result = await puter.ai.speech2txt(file);
+            const text = (typeof result === 'string') ? result : (result && result.text ? result.text : '');
+            if (text && text.trim()) {
+              fullFinalTranscript = text.trim();
+              liveInterimTranscript = '';
+              if (finalizedSpan) finalizedSpan.textContent = text.trim();
+              if (placeholder) placeholder.style.display = 'none';
+              updateLiveMetrics();
+              uploadStatus.textContent = `✅ Transcribed "${file.name}" successfully!`;
+              showToast('Audio file transcribed successfully! 🎙️', 'success');
+              return;
+            }
+          } catch (pErr) {
+            console.warn('Puter upload error:', pErr);
+          }
+        }
         uploadStatus.textContent = `❌ Error: ${err.message}`;
         showToast(`Upload failed: ${err.message}`, 'error');
       }

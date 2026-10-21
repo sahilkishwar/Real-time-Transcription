@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procucev AI — Real-time Multilingual Speech-to-Text Studio & Dashboard</title>
+  <meta name="description" content="Production-ready real-time multilingual Speech-to-Text service with Hinglish code-mixing support, relational database persistence, and CRUD dashboard.">
+
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="navbar">
+    <a href="#" class="nav-brand" id="navBrandLogo">
+      <div class="brand-icon">🎙️</div>
+      <div class="brand-info">
+        <h1>Procucev AI</h1>
+        <div class="brand-tag">Real-time Multilingual STT Studio</div>
+      </div>
+    </a>
+
+    <!-- Center Navigation Tabs -->
+    <nav class="nav-center">
+      <button class="nav-tab active" id="tabBtnStudio" data-target="tabStudio">
+        <span>🎙️</span> Live Studio
+      </button>
+      <button class="nav-tab" id="tabBtnDashboard" data-target="tabDashboard">
+        <span>📊</span> History & CRUD Dashboard
+      </button>
+      <button class="nav-tab" id="tabBtnDocs" data-target="tabDocs">
+        <span>⚡</span> Architecture & API Docs
+      </button>
+    </nav>
+
+    <!-- Right Controls -->
+    <div class="nav-right">
+      <div class="status-indicator" id="wsStatusBadge" title="WebSocket Status">
+        <span class="status-dot" id="wsStatusDot"></span>
+        <span id="wsStatusText">WebSocket Live</span>
+      </div>
+      <button class="icon-btn" id="themeToggleBtn" title="Toggle Dark/Light Mode">🌓</button>
+      <a href="/h2-console" target="_blank" class="icon-btn" title="Open H2 Database Console">🗄️</a>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="main-container">
+
+    <!-- ==================== TAB 1: LIVE STUDIO ==================== -->
+    <section id="tabStudio" class="tab-content active">
+      <div class="studio-grid">
+
+        <!-- Left Controls Column -->
+        <div class="studio-controls-col">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🎧 Audio Input & Engine</span>
+              <span class="badge badge-hinglish" id="activeEngineBadge">Gemini Live + Hybrid</span>
+            </div>
+
+            <!-- Big Microphone Center -->
+            <div class="mic-control-center">
+              <div class="mic-button-wrapper">
+                <div class="mic-glow-ring" id="micGlowRing"></div>
+                <button class="mic-button" id="toggleRecordBtn" title="Click or Press Spacebar to Record">
+                  <span id="micIcon">🎙️</span>
+                </button>
+              </div>
+              <div class="mic-status-label" id="micStatusLabel">Click to Start Listening</div>
+              <div class="mic-hint">Press <kbd style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">Spacebar</kbd> to toggle microphone</div>
+            </div>
+
+            <!-- Real-time Web Audio Visualizer -->
+            <div class="visualizer-box">
+              <canvas id="audioVisualizerCanvas"></canvas>
+            </div>
+
+            <!-- Audio Level Meter -->
+            <div class="audio-level-container">
+              <div class="audio-level-header">
+                <span>Mic Input Level</span>
+                <span id="audioLevelDbText">0 dB</span>
+              </div>
+              <div class="audio-level-bar">
+                <div class="audio-level-fill" id="audioLevelFill"></div>
+              </div>
+            </div>
+
+            <!-- Settings / Language Selectors -->
+            <div class="control-group">
+              <label class="control-label" for="languageSelect">Recognition Language Mode</label>
+              <select class="form-select" id="languageSelect">
+                <option value="hinglish" selected>✨ Multilingual Auto-Detect (Hinglish: Hindi + English)</option>
+                <option value="hi-IN">🇮🇳 Hindi (हिंदी - hi-IN)</option>
+                <option value="en-IN">🇮🇳 English (India - en-IN)</option>
+                <option value="en-US">🌐 English (Global - en-US)</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label class="control-label" for="engineSelect">Speech-to-Text Pipeline</label>
+              <select class="form-select" id="engineSelect">
+                <option value="hybrid" selected>Hybrid (Web Speech Stream + Backend AI)</option>
+                <option value="gemini">Google Gemini Live 3.1 Audio API</option>
+              </select>
+            </div>
+
+            <!-- Audio File Upload Dropzone -->
+            <div class="dropzone" id="audioDropzone">
+              <div class="dropzone-icon">📁</div>
+              <div class="dropzone-text">Drop an audio file here or <strong>browse</strong></div>
+              <div class="dropzone-hint">Supports WAV, MP3, WebM, OGG (Max 50MB)</div>
+              <input type="file" id="audioFileInput" accept="audio/*" style="display: none;">
+            </div>
+            <div id="fileUploadStatus" style="font-size: 0.8rem; margin-top: 0.5rem; text-align: center; color: var(--secondary); display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Right Live Transcript Column -->
+        <div class="studio-transcript-col">
+          <div class="card transcript-card">
+            <div class="card-header">
+              <span class="card-title">📝 Real-Time Live Transcript</span>
+              <div class="btn-group">
+                <button class="btn btn-outline" id="samplePromptBtn" title="Insert realistic Hinglish sample sentence">
+                  💡 Load Sample
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Analytics Telemetry Bar -->
+            <div class="stream-analytics-bar">
+              <div class="metric-pill">
+                <span>Language:</span>
+                <span class="badge badge-hinglish" id="streamLanguageBadge">Detecting...</span>
+              </div>
+              <div class="metric-pill">
+                <span>Code-Mix Ratio:</span>
+                <strong id="streamRatioText">Hindi: 0% | English: 0%</strong>
+              </div>
+              <div class="metric-pill">
+                <span>Words:</span>
+                <strong id="streamWordCount">0</strong>
+              </div>
+              <div class="metric-pill">
+                <span>Speaking Rate:</span>
+                <strong id="streamWpm">0 WPM</strong>
+              </div>
+              <div class="metric-pill">
+                <span>Duration:</span>
+                <strong id="streamTimer">00:00</strong>
+              </div>
+            </div>
+
+            <!-- Transcript Area -->
+            <div class="transcript-area" id="liveTranscriptArea">
+              <div class="transcript-placeholder" id="transcriptPlaceholder">
+                <div style="font-size: 2.2rem; opacity: 0.6;">🎙️</div>
+                <div style="font-weight: 500;">Speak naturally in Hindi, English, or mixed Hinglish.</div>
+                <div style="font-size: 0.85rem;">Words will be transcribed and detected in real-time as you speak.</div>
+              </div>
+              <span class="finalized-text" id="finalizedTextSpan"></span>
+              <span class="interim-text" id="interimTextSpan"></span>
+            </div>
+
+            <!-- Action Toolbar -->
+            <div class="action-toolbar">
+              <div class="btn-group">
+                <button class="btn btn-primary" id="saveTranscriptBtn" title="Save this transcription to Relational Database">
+                  💾 Save to Database
+                </button>
+                <button class="btn" id="ttsPlayBtn" title="Text-to-Speech audio playback">
+                  🔊 Read Aloud (TTS)
+                </button>
+                <button class="btn" id="aiPolishBtn" title="Refine Hinglish grammar, transliteration, or script">
+                  ✨ AI Hinglish Refine
+                </button>
+              </div>
+
+              <div class="btn-group">
+                <button class="btn btn-outline" id="copyTranscriptBtn" title="Copy text to clipboard">
+                  📋 Copy
+                </button>
+                <button class="btn btn-danger" id="clearTranscriptBtn" title="Clear current transcript">
+                  🗑️ Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: HISTORY & CRUD DASHBOARD ==================== -->
+    <section id="tabDashboard" class="tab-content">
+      
+      <!-- Top Metrics Row -->
+      <div class="dashboard-metrics-grid">
+        <div class="metric-card">
+          <div class="metric-icon-box" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">📑</div>
+          <div>
+            <div class="metric-val" id="statsTotalCount">0</div>
+            <div class="metric-title">Total Transcriptions</div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">🔤</div>
+          <div>
+            <div class="metric-val" id="statsTotalWords">0</div>
+            <div class="metric-title">Total Words Transcribed</div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box" style="background: rgba(236, 72, 153, 0.15); color: #f472b6;">🌐</div>
+          <div>
+            <div class="metric-val" id="statsHinglishRatio">60% / 40%</div>
+            <div class="metric-title">Hindi / English Code-Mix Avg</div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-icon-box" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">🗄️</div>
+          <div>
+            <div class="metric-val" style="font-size: 1.25rem; font-weight: 600;">H2 / PostgreSQL</div>
+            <div class="metric-title">Relational Database Active</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search, Filter & Bulk Actions Bar -->
+      <div class="history-controls-bar">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="historySearchInput" placeholder="Search transcriptions by title, content, or tags...">
+        </div>
+
+        <div class="filter-actions">
+          <select class="form-select" id="filterLanguageSelect" style="width: auto; min-width: 170px;">
+            <option value="all">🌐 All Languages</option>
+            <option value="Hinglish (Hindi + English)">✨ Hinglish (Code-Mixed)</option>
+            <option value="Hindi (हिंदी)">🇮🇳 Hindi (हिंदी)</option>
+            <option value="English">🌐 English</option>
+          </select>
+
+          <button class="btn btn-outline" id="filterFavoriteBtn" title="Filter Starred Only">
+            ⭐ Starred (<span id="favoriteCountSpan">0</span>)
+          </button>
+
+          <select class="form-select" id="historySortSelect" style="width: auto;">
+            <option value="createdAt-desc">⏳ Newest First</option>
+            <option value="createdAt-asc">⌛ Oldest First</option>
+            <option value="wordCount-desc">📚 Most Words</option>
+            <option value="title-asc">🔤 Title (A-Z)</option>
+          </select>
+
+          <!-- Export Menu -->
+          <div class="dropdown" style="position: relative;">
+            <button class="btn btn-outline" id="exportMenuBtn">
+              📥 Export ▼
+            </button>
+            <div class="dropdown-menu" id="exportDropdownMenu" style="display: none; position: absolute; right: 0; top: 110%; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); z-index: 50; min-width: 150px; box-shadow: var(--shadow-card);">
+              <a href="#" class="dropdown-item" data-export="json" style="display: block; padding: 0.6rem 1rem; color: var(--text-primary); text-decoration: none; font-size: 0.85rem;">📄 JSON Export</a>
+              <a href="#" class="dropdown-item" data-export="csv" style="display: block; padding: 0.6rem 1rem; color: var(--text-primary); text-decoration: none; font-size: 0.85rem;">📊 CSV Spreadsheet</a>
+              <a href="#" class="dropdown-item" data-export="txt" style="display: block; padding: 0.6rem 1rem; color: var(--text-primary); text-decoration: none; font-size: 0.85rem;">📝 Plain Text</a>
+              <a href="#" class="dropdown-item" data-export="srt" style="display: block; padding: 0.6rem 1rem; color: var(--text-primary); text-decoration: none; font-size: 0.85rem;">🎬 Subtitles (SRT)</a>
+            </div>
+          </div>
+
+          <button class="btn btn-primary" id="refreshHistoryBtn" title="Refresh records">
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- History Grid View -->
+      <div class="history-grid" id="historyGridContainer">
+        <!-- Rendered dynamically by dashboard.js -->
+      </div>
+
+      <!-- Empty State Container -->
+      <div class="empty-state" id="historyEmptyState" style="display: none;">
+        <div class="empty-icon">📭</div>
+        <h3>No transcriptions found</h3>
+        <p>Start recording in the Live Studio or adjust your search filter.</p>
+      </div>
+
+    </section>
+
+    <!-- ==================== TAB 3: ARCHITECTURE & API DOCS ==================== -->
+    <section id="tabDocs" class="tab-content">
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--primary);">Architecture & Technical Overview</h2>
+        <p style="color: var(--text-secondary); line-height: 1.7; margin-bottom: 1.5rem;">
+          This web application was engineered for the <strong>Procucev AI Tech Hiring Assignment</strong>.
+          It provides an end-to-end real-time speech-to-text service optimized for multilingual environments,
+          specifically code-switching between <strong>Hindi and English (Hinglish)</strong>, backed by a persistent relational database and full CRUD dashboard.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+          <div style="background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem; color: var(--secondary);">1. Multilingual Audio Engine</h3>
+            <ul style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; padding-left: 1.2rem;">
+              <li>Hybrid Web Speech API with sub-second interim streaming.</li>
+              <li>Google Gemini Live 3.1 Multimodal Audio API integration.</li>
+              <li>Heuristic & Unicode code-mixing ratio calculation (Hindi % vs English %).</li>
+              <li>Automatic punctuation, grammar, and script standardization.</li>
+            </ul>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem; color: #a78bfa;">2. Relational Database & Spring Data JPA</h3>
+            <ul style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; padding-left: 1.2rem;">
+              <li>Persistent H2 relational file storage for instant zero-config run.</li>
+              <li>PostgreSQL profile ready for production/cloud deployment.</li>
+              <li>Indexed search, pagination, multi-column sorting, and analytics aggregation.</li>
+              <li>H2 Web Console available at <code>/h2-console</code>.</li>
+            </ul>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem; color: #34d399;">3. Real-Time WebSocket Streaming</h3>
+            <ul style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; padding-left: 1.2rem;">
+              <li>Bidirectional WebSocket handler mounted at <code>/ws/transcribe</code>.</li>
+              <li>Real-time telemetry streaming for word counts, speaking rate (WPM), and language ratio.</li>
+              <li>Continuous connection heartbeat and auto-reconnect.</li>
+            </ul>
+          </div>
+
+          <div style="background: rgba(0,0,0,0.2); padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem; color: #fb923c;">4. Text-To-Speech (TTS) & Export</h3>
+            <ul style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; padding-left: 1.2rem;">
+              <li>Speech synthesis playback directly from the studio or any history card.</li>
+              <li>Multi-format export: JSON, CSV (Excel), Plain Text (TXT), and Subtitles (SRT).</li>
+              <li>Audio file dropzone accepting WAV, MP3, WebM, and OGG.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- REST API Reference -->
+      <div class="card">
+        <h2 style="font-size: 1.3rem; margin-bottom: 1rem;">REST API Endpoints Reference</h2>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-muted);">
+                <th style="padding: 0.75rem;">Method</th>
+                <th style="padding: 0.75rem;">Endpoint</th>
+                <th style="padding: 0.75rem;">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #10b981; color: #fff;">GET</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions</code></td>
+                <td style="padding: 0.75rem;">Fetch paginated list with search, language filter, and sort</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #3b82f6; color: #fff;">POST</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions</code></td>
+                <td style="padding: 0.75rem;">Create a new transcription record</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #eab308; color: #fff;">PUT</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions/{id}</code></td>
+                <td style="padding: 0.75rem;">Update transcription title, text content, notes, or tags</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #ec4899; color: #fff;">PATCH</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions/{id}/favorite</code></td>
+                <td style="padding: 0.75rem;">Toggle starred / favorite state</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #ef4444; color: #fff;">DELETE</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions/{id}</code></td>
+                <td style="padding: 0.75rem;">Delete single transcription record</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #10b981; color: #fff;">GET</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions/stats</code></td>
+                <td style="padding: 0.75rem;">Get dashboard analytics (total count, words, language distribution)</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #10b981; color: #fff;">GET</span></td>
+                <td style="padding: 0.75rem;"><code>/api/transcriptions/export?format=json|csv|txt|srt</code></td>
+                <td style="padding: 0.75rem;">Export all transcriptions in selected format</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--border-color);">
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #3b82f6; color: #fff;">POST</span></td>
+                <td style="padding: 0.75rem;"><code>/api/speech/transcribe-audio</code></td>
+                <td style="padding: 0.75rem;">Upload audio file and transcribe via Gemini / backend engine</td>
+              </tr>
+              <tr>
+                <td style="padding: 0.75rem;"><span class="badge" style="background: #3b82f6; color: #fff;">POST</span></td>
+                <td style="padding: 0.75rem;"><code>/api/speech/polish</code></td>
+                <td style="padding: 0.75rem;">Refine Hinglish text (grammar, Devanagari, Romanized, translation)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Save Transcription Modal -->
+  <div class="modal-overlay" id="saveModalOverlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">💾 Save Transcription to Database</h3>
+        <button class="modal-close-btn" data-close="saveModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="control-group">
+          <label class="control-label" for="saveModalTitle">Title</label>
+          <input type="text" class="form-input" id="saveModalTitle" placeholder="e.g. Hinglish Team Standup Discussion">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="saveModalContent">Transcript Content</label>
+          <textarea class="form-textarea" id="saveModalContent" rows="5"></textarea>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="saveModalTags">Tags (comma-separated)</label>
+          <input type="text" class="form-input" id="saveModalTags" placeholder="e.g. meeting, hinglish, sprint">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="saveModalNotes">Notes (optional)</label>
+          <textarea class="form-textarea" id="saveModalNotes" rows="2" placeholder="Additional notes or action items..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="saveModalOverlay">Cancel</button>
+        <button class="btn btn-primary" id="confirmSaveBtn">Save Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Transcription Modal -->
+  <div class="modal-overlay" id="editModalOverlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ Edit Transcription</h3>
+        <button class="modal-close-btn" data-close="editModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editModalId">
+        <div class="control-group">
+          <label class="control-label" for="editModalTitle">Title</label>
+          <input type="text" class="form-input" id="editModalTitle">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="editModalContent">Transcript Content</label>
+          <textarea class="form-textarea" id="editModalContent" rows="6"></textarea>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="editModalTags">Tags</label>
+          <input type="text" class="form-input" id="editModalTags">
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="editModalNotes">Notes</label>
+          <textarea class="form-textarea" id="editModalNotes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="editModalOverlay">Cancel</button>
+        <button class="btn btn-primary" id="confirmEditBtn">Update Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Polish Modal -->
+  <div class="modal-overlay" id="polishModalOverlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">✨ AI Hinglish Refinement</h3>
+        <button class="modal-close-btn" data-close="polishModalOverlay">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="control-group">
+          <label class="control-label">Refinement Mode</label>
+          <select class="form-select" id="polishModeSelect">
+            <option value="clean" selected>🧹 Clean & Punctuate (Standardize Hinglish)</option>
+            <option value="devanagari">🇮🇳 Convert Hindi to Devanagari (हिंदी + English loanwords)</option>
+            <option value="romanized">🔤 Clean Romanized Transliteration</option>
+            <option value="english_translation">🌐 Full English Translation</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label class="control-label">Original Speech Text</label>
+          <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.9rem;" id="polishOriginalPreview"></div>
+        </div>
+        <div class="control-group">
+          <label class="control-label">AI Refined Output</label>
+          <textarea class="form-textarea" id="polishResultContent" rows="4" placeholder="Click 'Process with AI' below..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="polishModalOverlay">Cancel</button>
+        <button class="btn" id="runPolishBtn">⚡ Process with AI</button>
+        <button class="btn btn-success" id="applyPolishBtn">Apply to Live Transcript</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div><strong>Procucev AI</strong> — Real-time Multilingual Speech-to-Text Assignment. Built with Java Spring Boot 3 & Relational DB.</div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/js/audio-visualizer.js"></script>
+  <script src="/js/speech-recognition.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
